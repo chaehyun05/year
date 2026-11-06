@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+  <title>My Year</title>
+  <meta name="theme-color" content="#F4F5F9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="My Year">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="year.css?v=1">
+</head>
+<body>
+  <div class="container">
+    <header class="app-header">
+      <h1>My Year <span class="title-meta"><span class="title-site">year</span><span class="title-room" id="title-room" hidden></span></span></h1>
+      <details class="more-tools" id="more-tools" hidden>
+        <summary class="btn" aria-label="더보기"><span aria-hidden="true">⋯</span></summary>
+        <div class="more-pop">
+          <button type="button" class="btn" id="backup-save">백업 파일 저장</button>
+          <button type="button" class="btn" id="backup-load">백업 불러오기</button>
+          <button type="button" class="btn" id="room-leave">기록방 나가기</button>
+        </div>
+      </details>
+    </header>
+
+    <!-- 기록방 -->
+    <section class="card login" id="login">
+      <h2>기록방 열기</h2>
+      <form id="room-form">
+        <input type="text" id="room-name" required minlength="2" maxlength="80" autocomplete="off" placeholder="예: 채현-주간플래너" aria-label="기록방 이름" aria-describedby="room-hint">
+        <button class="btn primary" type="submit">기록방 열기</button>
+      </form>
+      <p class="hint" id="room-hint">주간 플래너와 같은 이름을 쓰면 됩니다. 이름이 곧 열쇠라서, 이름을 아는 사람은 누구나 기록을 보고 고칠 수 있어요. 남이 짐작하기 어려운 8자 이상의 이름을 쓰세요.</p>
+      <p class="status" id="login-status" role="status"></p>
+    </section>
+
+    <main id="app" hidden>
+      <nav class="view-tabs" role="tablist" aria-label="화면">
+        <button type="button" role="tab" id="tab-all" aria-selected="true">연도별 한눈에</button>
+        <button type="button" role="tab" id="tab-year" aria-selected="false">연도 상세</button>
+      </nav>
+
+      <!-- 1. 연도별 한눈에 -->
+      <section class="card" id="view-all" role="tabpanel" aria-labelledby="tab-all">
+        <div class="table-header">
+          <h2>연도별 계획</h2>
+          <div class="actions">
+            <button type="button" class="btn" id="year-add-prev">＋ 이전 연도</button>
+            <button type="button" class="btn primary" id="year-add-next">＋ 다음 연도</button>
+          </div>
+        </div>
+        <div class="sheet">
+          <div class="sheet-side">
+            <div class="big-num" id="range-label">2026</div>
+            <div class="sheet-title">연간 계획표</div>
+            <p class="side-sub">칸을 누르면 그 달 계획을 적을 수 있어요. 연도를 누르면 자세히 볼 수 있어요.</p>
+          </div>
+          <div class="overview-scroll">
+            <table class="overview" id="overview"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. 연도 상세 -->
+      <section class="card" id="view-year" role="tabpanel" aria-labelledby="tab-year" hidden>
+        <div class="year-head">
+          <button type="button" class="btn icon" id="year-prev" aria-label="이전 연도">‹</button>
+          <div class="year-title"><span class="big-num" id="year-num">2026</span><span class="year-unit">년 계획</span></div>
+          <button type="button" class="btn icon" id="year-next" aria-label="다음 연도">›</button>
+          <button type="button" class="btn danger ghost" id="year-remove">이 연도 삭제</button>
+        </div>
+        <div class="year-goal">
+          <label for="year-goal-text">올해 목표</label>
+          <textarea id="year-goal-text" rows="2" placeholder="예: 정보처리기사 합격, 매일 30분 운동, 포트폴리오 3개 완성"></textarea>
+        </div>
+        <div class="progress" id="year-progress"></div>
+        <div class="months" id="months"></div>
+      </section>
+
+      <footer class="footer">
+        <span id="cloud-status" role="status">클라우드 연결 전</span>
+        <button type="button" class="btn small" id="cloud-reload" hidden>최신 기록 불러오기</button>
+      </footer>
+    </main>
+  </div>
+
+  <!-- 칸 편집 -->
+  <div class="modal-backdrop" id="cell-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cell-title">
+      <div class="modal-head">
+        <h3 id="cell-title">2026년 1월</h3>
+        <button type="button" class="btn icon" id="cell-close" aria-label="닫기">×</button>
+      </div>
+      <ul class="items" id="cell-items"></ul>
+      <form class="item-add" id="cell-add"><input type="text" id="cell-input" maxlength="200" placeholder="계획을 입력하고 Enter" aria-label="계획 추가"><button class="btn primary" type="submit">추가</button></form>
+      <label class="memo-label" for="cell-memo">메모</label>
+      <textarea id="cell-memo" rows="3" placeholder="이 달에 대한 메모"></textarea>
+      <div class="modal-buttons">
+        <button type="button" class="btn" id="cell-goto">연도 상세 보기</button>
+        <button type="button" class="btn primary" id="cell-done">완료</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="backup-file" accept="application/json,.json" hidden>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="supabase-config.js"></script>
+  <script src="year.js?v=1"></script>
+</body>
+</html>
