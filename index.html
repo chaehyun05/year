@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="year.css?v=1">
+  <link rel="stylesheet" href="year.css?v=2">
 </head>
 <body>
   <div class="container">
@@ -58,7 +58,7 @@
           <div class="sheet-side">
             <div class="big-num" id="range-label">2026</div>
             <div class="sheet-title">연간 계획표</div>
-            <p class="side-sub">칸을 누르면 그 달 계획을 적을 수 있어요. 연도를 누르면 자세히 볼 수 있어요.</p>
+            <p class="side-sub">칸을 누르면 그 달 계획을 적을 수 있어요. 여러 칸을 끌어서 고르면 한 번에 추가돼요<span class="touch-only"> (꾹 누른 채 끌기)</span>. 연도를 누르면 자세히 볼 수 있어요.</p>
           </div>
           <div class="overview-scroll">
             <table class="overview" id="overview"></table>
@@ -107,10 +107,30 @@
     </div>
   </div>
 
+  <!-- 여러 달 한 번에 추가 -->
+  <div class="modal-backdrop" id="multi-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="multi-title">
+      <div class="modal-head">
+        <h3 id="multi-title">여러 달에 추가</h3>
+        <button type="button" class="btn icon" id="multi-close" aria-label="닫기">×</button>
+      </div>
+      <p class="multi-range" id="multi-range"></p>
+      <form id="multi-form">
+        <label class="memo-label" for="multi-text">추가할 계획 <small>한 줄에 하나씩</small></label>
+        <textarea id="multi-text" rows="3" maxlength="2000" placeholder="예: 토익 공부 주 3회&#10;포트폴리오 1개 진행"></textarea>
+        <div class="modal-buttons">
+          <button type="button" class="btn" id="multi-cancel">취소</button>
+          <button type="submit" class="btn primary" id="multi-submit">선택한 칸에 추가</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <input type="file" id="backup-file" accept="application/json,.json" hidden>
+  <div class="sel-tip" id="sel-tip" hidden></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="supabase-config.js"></script>
-  <script src="year.js?v=1"></script>
+  <script src="year.js?v=2"></script>
 </body>
 </html>

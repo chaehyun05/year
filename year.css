@@ -199,3 +199,13 @@ textarea:focus,input:focus{outline:2px solid var(--cobalt);outline-offset:0;bord
   .month textarea:focus{height:84px}
   .items:empty::before{padding:4px 2px}
 }
+
+/* 여러 달 선택 */
+.overview .cell{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.overview .cell.sel{background:#DDE3FF!important;box-shadow:inset 0 0 0 2px var(--cobalt)}
+.sel-tip{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);transform:translateX(-50%);z-index:90;padding:8px 14px;border-radius:999px;background:var(--cobalt);color:#fff;font-size:14px;font-weight:700;box-shadow:0 6px 18px rgba(35,64,232,.3);pointer-events:none}
+.multi-range{margin:0;padding:10px 12px;border-radius:10px;background:var(--cobalt-soft);color:var(--cobalt);font-weight:700}
+#multi-form{display:flex;flex-direction:column;gap:8px}
+.memo-label small{font-weight:500;color:var(--faint);margin-left:4px}
+.touch-only{display:none}
+@media (hover:none) and (pointer:coarse){.touch-only{display:inline}}

@@ -180,6 +180,7 @@ document.addEventListener('keydown', (e) => {
     items(r.y, r.m).splice(r.idx, 0, r.item); commit(); renderAll(); renderCell(); toast('되돌렸어요');
   }
   if (e.key === 'Escape' && modal) closeCell();
+  if (e.key === 'Escape' && multi) closeMulti();
 });
 
 /* ---------------- 화면 전환 ---------------- */
@@ -323,9 +324,101 @@ $('tab-year').addEventListener('click', () => goYear(curYear));
 window.addEventListener('popstate', route);
 
 $('overview').addEventListener('click', (e) => {
+  if (suppressClick) { suppressClick = false; return; }
   const yl = e.target.closest('.year-link'); if (yl) return goYear(Number(yl.dataset.year));
   const c = e.target.closest('.cell'); if (c) openCell(Number(c.dataset.y), Number(c.dataset.m));
 });
+
+/* ---------------- 여러 달 끌어서 선택 ---------------- */
+// PC: 마우스로 끌기 · 휴대폰: 칸을 꾹(0.35초) 누른 뒤 끌기 (그냥 밀면 스크롤)
+let sel = null, suppressClick = false, selected = [];
+const cellOf = (x, y) => document.elementFromPoint(x, y)?.closest?.('#overview .cell');
+function selRange(a, b) {
+  const ys = data.years, i1 = ys.indexOf(a.y), i2 = ys.indexOf(b.y);
+  const years = ys.slice(Math.min(i1, i2), Math.max(i1, i2) + 1);
+  const m1 = Math.min(a.m, b.m), m2 = Math.max(a.m, b.m);
+  const out = []; for (const y of years) for (let m = m1; m <= m2; m++) out.push({ y, m });
+  return out;
+}
+function paintSel() {
+  document.querySelectorAll('#overview .cell.sel').forEach((c) => c.classList.remove('sel'));
+  if (!sel) return;
+  selected = selRange(sel.a, sel.b);
+  for (const { y, m } of selected) document.querySelector(`#overview .cell[data-y="${y}"][data-m="${m}"]`)?.classList.add('sel');
+  const tip = $('sel-tip');
+  tip.textContent = rangeText(selected); tip.hidden = selected.length < 2;
+}
+function rangeText(list) {
+  if (!list.length) return '';
+  const ys = [...new Set(list.map((c) => c.y))], ms = list.map((c) => c.m);
+  const m1 = Math.min(...ms), m2 = Math.max(...ms);
+  const yt = ys.length > 1 ? `${ys[0]}~${ys[ys.length - 1]}년` : `${ys[0]}년`;
+  return `${yt} ${m1 === m2 ? m1 + '월' : `${m1}~${m2}월`} · ${list.length}칸`;
+}
+function startSel(cell) { sel = { a: { y: Number(cell.dataset.y), m: Number(cell.dataset.m) }, moved: false }; sel.b = sel.a; paintSel(); }
+function moveSel(cell) {
+  if (!sel || !cell) return;
+  const b = { y: Number(cell.dataset.y), m: Number(cell.dataset.m) };
+  if (b.y === sel.b.y && b.m === sel.b.m) return;
+  sel.b = b; sel.moved = true; paintSel();
+}
+function endSel(force) {
+  if (!sel) return;
+  const s = sel; sel = null; $('sel-tip').hidden = true;
+  if (s.moved || force) { suppressClick = true; setTimeout(() => { suppressClick = false; }, 400); openMulti(selRange(s.a, s.b)); }
+  else { selected = []; paintSel(); }
+}
+const ov = $('overview');
+ov.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch' || e.button !== 0) return;
+  const c = e.target.closest('.cell'); if (!c) return;
+  e.preventDefault(); startSel(c);
+});
+document.addEventListener('pointermove', (e) => { if (sel && e.pointerType !== 'touch') moveSel(cellOf(e.clientX, e.clientY)); });
+document.addEventListener('pointerup', (e) => { if (sel && e.pointerType !== 'touch') endSel(false); });
+let press = null;
+ov.addEventListener('touchstart', (e) => {
+  const c = e.target.closest('.cell'); if (!c || e.touches.length > 1) return;
+  const t = e.touches[0];
+  press = { x: t.clientX, y: t.clientY, timer: setTimeout(() => { if (!press) return; press.active = true; startSel(c); navigator.vibrate?.(15); }, 350) };
+}, { passive: true });
+document.addEventListener('touchmove', (e) => {
+  if (!press) return;
+  const t = e.touches[0];
+  if (!press.active) { if (Math.hypot(t.clientX - press.x, t.clientY - press.y) > 8) { clearTimeout(press.timer); press = null; } return; }
+  e.preventDefault(); moveSel(cellOf(t.clientX, t.clientY));
+}, { passive: false });
+document.addEventListener('touchend', (e) => {
+  if (!press) return;
+  clearTimeout(press.timer);
+  if (press.active) { e.preventDefault(); endSel(true); }
+  press = null;
+}, { passive: false });
+document.addEventListener('touchcancel', () => { if (press) { clearTimeout(press.timer); press = null; if (sel) { sel = null; selected = []; paintSel(); $('sel-tip').hidden = true; } } });
+ov.addEventListener('contextmenu', (e) => { if (press?.active || sel) e.preventDefault(); });
+
+let multi = null;
+function openMulti(list) {
+  if (list.length === 1) { selected = []; paintSel(); return openCell(list[0].y, list[0].m); }
+  multi = list;
+  $('multi-range').textContent = rangeText(list);
+  $('multi-text').value = '';
+  $('multi-modal').hidden = false;
+  setTimeout(() => $('multi-text').focus(), 30);
+}
+function closeMulti() { multi = null; $('multi-modal').hidden = true; selected = []; paintSel(); }
+$('multi-form').addEventListener('submit', (e) => {
+  e.preventDefault(); if (!multi) return;
+  const lines = $('multi-text').value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => l.slice(0, 200));
+  if (!lines.length) { $('multi-text').focus(); return; }
+  for (const { y, m } of multi) for (const t of lines) items(y, m).push({ id: uid(), text: t, done: false });
+  const n = multi.length; commit(); closeMulti(); renderAll();
+  toast(`${n}칸에 ${lines.length}개씩 추가했어요`);
+});
+$('multi-text').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $('multi-form').requestSubmit(); });
+$('multi-close').addEventListener('click', closeMulti);
+$('multi-cancel').addEventListener('click', closeMulti);
+$('multi-modal').addEventListener('click', (e) => { if (e.target === $('multi-modal')) closeMulti(); });
 $('year-add-next').addEventListener('click', () => { const y = data.years[data.years.length - 1] + 1; data.years.push(y); commit(); renderAll(); toast(`${y}년을 추가했어요`); const s = document.querySelector('.overview-scroll'); s.scrollTo({ left: s.scrollWidth, behavior: 'smooth' }); });
 $('year-add-prev').addEventListener('click', () => { const y = data.years[0] - 1; data.years.unshift(y); commit(); renderAll(); toast(`${y}년을 추가했어요`); document.querySelector('.overview-scroll').scrollTo({ left: 0, behavior: 'smooth' }); });
 
