@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="year.css?v=2">
+  <link rel="stylesheet" href="year.css?v=3">
 </head>
 <body>
   <div class="container">
@@ -115,6 +115,10 @@
         <button type="button" class="btn icon" id="multi-close" aria-label="닫기">×</button>
       </div>
       <p class="multi-range" id="multi-range"></p>
+      <div class="multi-existing" id="multi-existing" hidden>
+        <div class="mx-head"><span class="memo-label">선택한 칸에 있는 계획</span><button type="button" class="btn small danger ghost" id="multi-clear">모두 지우기</button></div>
+        <ul class="mx-list" id="multi-existing-list"></ul>
+      </div>
       <form id="multi-form">
         <label class="memo-label" for="multi-text">추가할 계획 <small>한 줄에 하나씩</small></label>
         <textarea id="multi-text" rows="3" maxlength="2000" placeholder="예: 토익 공부 주 3회&#10;포트폴리오 1개 진행"></textarea>
@@ -127,10 +131,22 @@
   </div>
 
   <input type="file" id="backup-file" accept="application/json,.json" hidden>
+  <!-- 같이 넣은 계획 지우기 -->
+  <div class="modal-backdrop" id="del-modal" hidden>
+    <div class="modal small-modal" role="dialog" aria-modal="true" aria-labelledby="del-title">
+      <h3 id="del-title">어디까지 지울까요?</h3>
+      <p class="del-desc"><b id="del-text"></b> 계획이 여러 칸에 있어요.<br><span id="del-range" class="del-range"></span></p>
+      <div class="modal-buttons stacked">
+        <button type="button" class="btn danger" id="del-all">모두 지우기</button>
+        <button type="button" class="btn" id="del-one">이 달만 지우기</button>
+        <button type="button" class="btn ghost" id="del-cancel">취소</button>
+      </div>
+    </div>
+  </div>
   <div class="sel-tip" id="sel-tip" hidden></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="supabase-config.js"></script>
-  <script src="year.js?v=2"></script>
+  <script src="year.js?v=3"></script>
 </body>
 </html>

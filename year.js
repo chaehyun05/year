@@ -25,7 +25,7 @@ function validate(raw) {
     for (const m of MONTHS) {
       const list = Array.isArray(p.months?.[m]) ? p.months[m] : [];
       const items = list.filter((it) => it && typeof it.text === 'string').slice(0, 200)
-        .map((it) => ({ id: typeof it.id === 'string' ? it.id : uid(), text: it.text.slice(0, 200), done: !!it.done }));
+        .map((it) => ({ id: typeof it.id === 'string' ? it.id : uid(), text: it.text.slice(0, 200), done: !!it.done, ...(typeof it.g === 'string' ? { g: it.g } : {}) }));
       if (items.length) out.months[m] = items;
       const memo = p.memos?.[m];
       if (typeof memo === 'string' && memo) out.memos[m] = memo.slice(0, 2000);
@@ -167,18 +167,69 @@ function bindItems(root, rerender) {
     if (!del) return;
     const li = del.closest('.item'); const { list, idx } = findItem(li);
     if (idx < 0) return;
-    const [removed] = list.splice(idx, 1);
-    lastRemoved = { y: li.dataset.y, m: li.dataset.m, idx, item: removed };
-    commit(); rerender();
-    toast(`"${removed.text}" 삭제됨 · 되돌리려면 Ctrl+Z`);
+    const it = list[idx], y = Number(li.dataset.y), m = Number(li.dataset.m);
+    const others = siblingsOf(it);
+    if (others.length > 1) return askDelete(it, y, m, others, rerender);
+    removeItems([{ y, m, id: it.id }]); rerender();
   });
 }
+/* 같이 넣은 계획 찾기: 여러 달에 한 번에 넣은 것(묶음)은 묶음으로, 예전에 넣은 것은 같은 이름으로 */
+function allItems() {
+  const out = [];
+  for (const y of data.years) for (const m of MONTHS) for (const it of data.plans[y]?.months[m] || []) out.push({ y, m, it });
+  return out;
+}
+function siblingsOf(it) {
+  const all = allItems();
+  return it.g ? all.filter((x) => x.it.g === it.g) : all.filter((x) => x.it.text === it.text);
+}
+// "2026년 1~4월, 6월 · 2027년 3월" 처럼 칸 목록을 짧게
+function cellsText(cells) {
+  const by = {};
+  for (const c of cells) (by[c.y] ||= new Set()).add(c.m);
+  return Object.keys(by).sort().map((y) => {
+    const ms = [...by[y]].sort((a, b) => a - b), runs = [];
+    for (const m of ms) { const r = runs[runs.length - 1]; if (r && m === r[1] + 1) r[1] = m; else runs.push([m, m]); }
+    return `${y}년 ` + runs.map(([a, b]) => (a === b ? `${a}월` : `${a}~${b}월`)).join(', ');
+  }).join(' · ');
+}
 let lastRemoved = null;
-document.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && lastRemoved && !/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) {
-    const r = lastRemoved; lastRemoved = null;
-    items(r.y, r.m).splice(r.idx, 0, r.item); commit(); renderAll(); renderCell(); toast('되돌렸어요');
+function removeItems(targets, label) {
+  const removed = [];
+  for (const t of targets) {
+    const list = data.plans[t.y]?.months[t.m]; if (!list) continue;
+    const idx = list.findIndex((x) => x.id === t.id); if (idx < 0) continue;
+    removed.push({ y: t.y, m: t.m, idx, item: list.splice(idx, 1)[0] });
   }
+  if (!removed.length) return;
+  lastRemoved = removed;
+  commit(); renderOverview(); if (!$('view-year').hidden) renderYear(); renderCell();
+  toast(label || `"${removed[0].item.text}" 삭제됨`, '되돌리기', undoRemove);
+}
+function undoRemove() {
+  if (!lastRemoved) return;
+  const r = lastRemoved; lastRemoved = null;
+  for (const x of [...r].reverse()) items(x.y, x.m).splice(Math.min(x.idx, items(x.y, x.m).length), 0, x.item);
+  commit(); renderAll(); renderCell(); toast('되돌렸어요');
+}
+let pendingDel = null;
+function askDelete(it, y, m, others, rerender) {
+  pendingDel = { it, y, m, others, rerender, back: document.activeElement };
+  $('del-text').textContent = `"${it.text}"`;
+  $('del-range').textContent = cellsText(others.map((x) => ({ y: x.y, m: x.m })));
+  $('del-all').textContent = `${others.length}칸 모두 지우기`;
+  $('del-one').textContent = `${y}년 ${m}월만 지우기`;
+  $('del-modal').hidden = false;
+  setTimeout(() => $('del-all').focus(), 30);
+}
+function closeDel() { const b = pendingDel?.back; pendingDel = null; $('del-modal').hidden = true; if (b && document.body.contains(b)) b.focus?.(); }
+$('del-one').addEventListener('click', () => { const p = pendingDel; if (!p) return; closeDel(); removeItems([{ y: p.y, m: p.m, id: p.it.id }]); });
+$('del-all').addEventListener('click', () => { const p = pendingDel; if (!p) return; closeDel(); removeItems(p.others.map((x) => ({ y: x.y, m: x.m, id: x.it.id })), `"${p.it.text}" ${p.others.length}칸 삭제됨`); });
+$('del-cancel').addEventListener('click', closeDel);
+$('del-modal').addEventListener('click', (e) => { if (e.target === $('del-modal')) closeDel(); });
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && lastRemoved && !/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) { e.preventDefault(); undoRemove(); }
+  if (e.key === 'Escape' && pendingDel) { closeDel(); return; }
   if (e.key === 'Escape' && modal) closeCell();
   if (e.key === 'Escape' && multi) closeMulti();
 });
@@ -365,11 +416,12 @@ function moveSel(cell) {
 function endSel(force) {
   if (!sel) return;
   const s = sel; sel = null; $('sel-tip').hidden = true;
-  if (s.moved || force) { suppressClick = true; setTimeout(() => { suppressClick = false; }, 400); openMulti(selRange(s.a, s.b)); }
+  if (s.moved || force) { suppressClick = !force; setTimeout(() => { suppressClick = false; }, 400); openMulti(selRange(s.a, s.b)); }
   else { selected = []; paintSel(); }
 }
 const ov = $('overview');
 ov.addEventListener('pointerdown', (e) => {
+  suppressClick = false;
   if (e.pointerType === 'touch' || e.button !== 0) return;
   const c = e.target.closest('.cell'); if (!c) return;
   e.preventDefault(); startSel(c);
@@ -403,15 +455,42 @@ function openMulti(list) {
   multi = list;
   $('multi-range').textContent = rangeText(list);
   $('multi-text').value = '';
+  renderMultiExisting();
   $('multi-modal').hidden = false;
   setTimeout(() => $('multi-text').focus(), 30);
 }
+function multiExisting() {
+  const map = new Map();
+  for (const { y, m } of multi || []) for (const it of data.plans[y]?.months[m] || []) {
+    if (!map.has(it.text)) map.set(it.text, []);
+    map.get(it.text).push({ y, m, id: it.id });
+  }
+  return map;
+}
+function renderMultiExisting() {
+  const map = multiExisting();
+  $('multi-existing').hidden = !map.size;
+  $('multi-existing-list').innerHTML = [...map].map(([t, cells], i) =>
+    `<li><span class="mx-text">${esc(t)}</span><small>${esc(cellsText(cells))}</small><button type="button" class="btn small danger" data-mx="${i}">지우기</button></li>`).join('');
+}
+$('multi-existing-list').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-mx]'); if (!b) return;
+  const [t, cells] = [...multiExisting()][Number(b.dataset.mx)] || [];
+  if (!cells) return;
+  removeItems(cells, `"${t}" ${cells.length}칸 삭제됨`); renderMultiExisting();
+});
+$('multi-clear').addEventListener('click', () => {
+  const cells = [...multiExisting().values()].flat(); if (!cells.length) return;
+  if (!confirm(`선택한 칸의 계획 ${cells.length}개를 모두 지울까요?`)) return;
+  removeItems(cells, `계획 ${cells.length}개 삭제됨`); renderMultiExisting();
+});
 function closeMulti() { multi = null; $('multi-modal').hidden = true; selected = []; paintSel(); }
 $('multi-form').addEventListener('submit', (e) => {
   e.preventDefault(); if (!multi) return;
   const lines = $('multi-text').value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => l.slice(0, 200));
   if (!lines.length) { $('multi-text').focus(); return; }
-  for (const { y, m } of multi) for (const t of lines) items(y, m).push({ id: uid(), text: t, done: false });
+  const gs = lines.map(() => uid());
+  for (const { y, m } of multi) lines.forEach((t, i) => items(y, m).push({ id: uid(), text: t, done: false, g: gs[i] }));
   const n = multi.length; commit(); closeMulti(); renderAll();
   toast(`${n}칸에 ${lines.length}개씩 추가했어요`);
 });
@@ -492,7 +571,12 @@ $('cloud-reload').addEventListener('click', () => {
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') cloud.refresh(false); });
 
 let toastTimer;
-function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2200); }
+function toast(t, actionLabel, action) {
+  const el = $('toast'); el.textContent = t;
+  if (actionLabel) { const b = document.createElement('button'); b.type = 'button'; b.textContent = actionLabel; b.addEventListener('click', () => { el.classList.remove('show'); action(); }); el.append(b); }
+  el.classList.toggle('has-action', !!actionLabel); el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), actionLabel ? 5000 : 2200);
+}
 
 /* ---------------- 시작 ---------------- */
 const saved = localStorage.getItem(ROOM_KEY);
