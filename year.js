@@ -553,11 +553,50 @@ $('backup-save').addEventListener('click', () => {
   a.download = `my-year-${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   $('more-tools').open = false;
 });
+// 계획 추가 파일(kind: 'myyear-patch'): 지금 기록은 그대로 두고, 고른 항목만 빼고 새 항목을 더해요.
+function applyPatch(p) {
+  const rm = Array.isArray(p.removeIf) ? p.removeIf.filter((k) => typeof k === 'string' && k) : [];
+  const hit = (t) => rm.some((k) => String(t).includes(k));
+  let removed = 0, added = 0;
+  const before = JSON.stringify(data);
+  if (rm.length) for (const y of Object.keys(data.plans)) {
+    const pl = data.plans[y];
+    for (const m of MONTHS) {
+      const l = pl.months[m];
+      if (l) { const keep = l.filter((it) => !hit(it.text)); removed += l.length - keep.length; if (keep.length) pl.months[m] = keep; else delete pl.months[m]; }
+      if (pl.memos?.[m] && hit(pl.memos[m])) delete pl.memos[m];
+    }
+    if (pl.goal && hit(pl.goal)) pl.goal = '';
+  }
+  for (const [ys, v] of Object.entries(p.add || {})) {
+    const y = Number(ys);
+    if (!Number.isInteger(y) || !v || typeof v !== 'object') continue;
+    if (!data.years.includes(y)) { data.years.push(y); data.years.sort((a, b) => a - b); }
+    const pl = plan(y);
+    if (typeof v.goal === 'string') pl.goal = v.goal.slice(0, 2000);
+    for (const [ms, list] of Object.entries(v.months || {})) {
+      const m = Number(ms); if (!MONTHS.includes(m) || !Array.isArray(list)) continue;
+      const arr = items(y, m);
+      for (const t of list) {
+        if (typeof t !== 'string' || !t || arr.some((it) => it.text === t)) continue;
+        arr.push({ id: uid(), text: t.slice(0, 200), done: false, g: 'p' + y + ':' + t.slice(0, 60) }); added++;
+      }
+    }
+    for (const [ms, memo] of Object.entries(v.memos || {})) {
+      const m = Number(ms); if (MONTHS.includes(m) && typeof memo === 'string') pl.memos[m] = memo.slice(0, 2000);
+    }
+  }
+  const msg = `계획 추가 파일이에요. 기존 항목 ${removed}개를 빼고 새 항목 ${added}개를 더할까요? (나머지 기록은 그대로 둬요)`;
+  if (!confirm(msg)) { data = validate(JSON.parse(before)) || data; renderAll(); return; }
+  commit(); renderAll(); toast(`${added}개를 추가했어요`);
+}
 $('backup-load').addEventListener('click', () => { $('backup-file').click(); $('more-tools').open = false; });
 $('backup-file').addEventListener('change', async (e) => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   try {
-    const d = validate(JSON.parse(await f.text()));
+    const raw = JSON.parse(await f.text());
+    if (raw?.kind === 'myyear-patch') { applyPatch(raw); return; }
+    const d = validate(raw);
     if (!d) throw Error();
     if (!confirm('백업 파일로 지금 기록을 바꿀까요? 현재 내용은 사라져요.')) return;
     data = d; commit(); renderAll(); toast('백업을 불러왔어요');
