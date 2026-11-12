@@ -12,7 +12,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':
 
 /* ---------------- 데이터 ---------------- */
 function blank() {
-  return { kind: 'myyear', version: 1, years: [0,1,2,3,4].map((i) => THIS_YEAR + i), plans: {} };
+  return { kind: 'myyear', version: 1, years: [0,1,2,3,4].map((i) => THIS_YEAR + i), plans: {}, todos: [], mandals: [] };
 }
 function validate(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -33,7 +33,13 @@ function validate(raw) {
     plans[y] = out;
   }
   if (!years.length) return null;
-  return { kind: 'myyear', version: 1, years, plans };
+  const todos = (Array.isArray(raw.todos) ? raw.todos : []).filter((t) => t && typeof t.text === 'string' && t.text.trim()).slice(0, 500)
+    .map((t) => ({ id: typeof t.id === 'string' ? t.id : uid(), text: t.text.slice(0, 300), done: !!t.done }));
+  const mandals = (Array.isArray(raw.mandals) ? raw.mandals : []).slice(0, 20).map((md) => ({
+    id: typeof md?.id === 'string' ? md.id : uid(),
+    cells: Array.from({ length: 9 }, (_, b) => Array.from({ length: 9 }, (_, c) => { const v = md?.cells?.[b]?.[c]; return typeof v === 'string' ? v.slice(0, 100) : ''; })),
+  }));
+  return { kind: 'myyear', version: 1, years, plans, todos, mandals };
 }
 let data = blank();
 const plan = (y) => (data.plans[y] ||= { goal: '', months: {}, memos: {} });
@@ -235,23 +241,24 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ---------------- 화면 전환 ---------------- */
+const VIEWS = ['all', 'year', 'todo', 'mandal'];
+let curView = 'all';
 function show(view, year) {
+  if (!VIEWS.includes(view)) view = 'all';
+  curView = view;
   if (year && data.years.includes(year)) curYear = year;
   if (!data.years.includes(curYear)) curYear = data.years.includes(THIS_YEAR) ? THIS_YEAR : data.years[0];
-  const all = view !== 'year';
-  $('view-all').hidden = !all; $('view-year').hidden = all;
-  $('tab-all').setAttribute('aria-selected', String(all));
-  $('tab-year').setAttribute('aria-selected', String(!all));
-  $('tab-year').textContent = all ? '연도 상세' : `${curYear}년 상세`;
-  const hash = all ? '#all' : '#y' + curYear;
+  for (const v of VIEWS) { $('view-' + v).hidden = v !== view; $('tab-' + v).setAttribute('aria-selected', String(v === view)); }
+  $('tab-year').textContent = view === 'year' ? `${curYear}년 상세` : '연도 상세';
+  const hash = view === 'year' ? '#y' + curYear : '#' + view;
   if (location.hash !== hash) history.replaceState(null, '', hash);
   renderAll();
 }
 function route() {
   const m = /^#y(\d{4})$/.exec(location.hash);
-  if (m) show('year', Number(m[1])); else show('all');
+  if (m) show('year', Number(m[1])); else show(location.hash.slice(1) || 'all');
 }
-function renderAll() { renderOverview(); if (!$('view-year').hidden) renderYear(); }
+function renderAll() { renderOverview(); if (curView === 'year') renderYear(); if (curView === 'todo') renderTodos(); if (curView === 'mandal') renderMandals(); }
 function goYear(y) { history.pushState(null, '', '#y' + y); show('year', y); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
 /* ---------------- 저장 (이 기기 + 클라우드) ---------------- */
@@ -346,6 +353,7 @@ const cloud = (() => {
       $('login').hidden = true; $('app').hidden = false; $('more-tools').hidden = false;
       loaded = true;
       status(name.length < 8 ? '연결됨 · 이름이 짧아 남이 짐작하기 쉬워요.' : '클라우드 연결됨');
+      window.MyRooms?.remember(name);
       route();
       if (dirty) save();
     } catch (e) {
@@ -372,6 +380,8 @@ const cloud = (() => {
 $('room-form').addEventListener('submit', (e) => { e.preventDefault(); cloud.open($('room-name').value); });
 $('tab-all').addEventListener('click', () => { history.pushState(null, '', '#all'); show('all'); });
 $('tab-year').addEventListener('click', () => goYear(curYear));
+$('tab-todo').addEventListener('click', () => { history.pushState(null, '', '#todo'); show('todo'); });
+$('tab-mandal').addEventListener('click', () => { history.pushState(null, '', '#mandal'); show('mandal'); });
 window.addEventListener('popstate', route);
 
 $('overview').addEventListener('click', (e) => {
@@ -617,9 +627,109 @@ function toast(t, actionLabel, action) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), actionLabel ? 5000 : 2200);
 }
 
+/* ---------------- 할 일 ---------------- */
+let todoFilter = 'all', lastTodos = null;
+function renderTodos() {
+  const list = data.todos || (data.todos = []);
+  const shown = list.filter((t) => todoFilter === 'all' || (todoFilter === 'done' ? t.done : !t.done));
+  const done = list.filter((t) => t.done).length;
+  $('todo-count').textContent = list.length ? `완료 ${done} / ${list.length}` : '';
+  $('todo-items').innerHTML = shown.map((t) => `<li class="item${t.done ? ' done' : ''}" data-tid="${esc(t.id)}">
+    <input type="checkbox" ${t.done ? 'checked' : ''} aria-label="${esc(t.text)} 완료">
+    <input type="text" class="txt" value="${esc(t.text)}" maxlength="300" aria-label="할 일 내용">
+    <button type="button" class="del" aria-label="${esc(t.text)} 삭제">×</button></li>`).join('');
+  $('todo-items').dataset.empty = !list.length ? '아직 할 일이 없어요' : (shown.length ? '' : '해당하는 할 일이 없어요');
+  $('todo-clear-done').disabled = !done; $('todo-clear-all').disabled = !list.length;
+  document.querySelectorAll('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === todoFilter)));
+}
+const todoOf = (el) => data.todos.find((t) => t.id === el.closest('[data-tid]')?.dataset.tid);
+function removeTodos(pred, label) {
+  const before = data.todos.slice();
+  const keep = data.todos.filter((t) => !pred(t));
+  if (keep.length === before.length) return;
+  lastTodos = before; data.todos = keep; commit(); renderTodos();
+  toast(label, '되돌리기', () => { if (!lastTodos) return; data.todos = lastTodos; lastTodos = null; commit(); renderTodos(); toast('되돌렸어요'); });
+}
+$('todo-add').addEventListener('submit', (e) => {
+  e.preventDefault(); const v = $('todo-input').value.trim(); if (!v) return;
+  data.todos.push({ id: uid(), text: v.slice(0, 300), done: false }); $('todo-input').value = '';
+  if (todoFilter === 'done') todoFilter = 'all';
+  commit(); renderTodos(); $('todo-input').focus();
+});
+$('todo-items').addEventListener('change', (e) => {
+  const t = todoOf(e.target); if (!t) return;
+  if (e.target.type === 'checkbox') { t.done = e.target.checked; commit(); renderTodos(); }
+  else if (e.target.classList.contains('txt')) { const v = e.target.value.trim(); if (!v) removeTodos((x) => x === t, `"${t.text}" 삭제됨`); else { t.text = v; commit(); } }
+});
+$('todo-items').addEventListener('input', (e) => { const t = todoOf(e.target); if (t && e.target.classList.contains('txt') && e.target.value.trim()) { t.text = e.target.value.trim(); commit(); } });
+$('todo-items').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.classList.contains('txt')) { e.preventDefault(); e.target.blur(); } });
+$('todo-items').addEventListener('click', (e) => { const d = e.target.closest('.del'); if (!d) return; const t = todoOf(d); if (t) removeTodos((x) => x === t, `"${t.text}" 삭제됨`); });
+document.querySelectorAll('[data-filter]').forEach((b) => b.addEventListener('click', () => { todoFilter = b.dataset.filter; renderTodos(); }));
+$('todo-clear-done').addEventListener('click', () => { const n = data.todos.filter((t) => t.done).length; if (n) removeTodos((t) => t.done, `완료한 일 ${n}개 삭제됨`); });
+$('todo-clear-all').addEventListener('click', () => { const n = data.todos.length; if (n && confirm(`할 일 ${n}개를 모두 지울까요?`)) removeTodos(() => true, `할 일 ${n}개 삭제됨`); });
+
+/* ---------------- 만다라트 ---------------- */
+// cells[블록][칸], 블록·칸 모두 0~8, 4가 가운데. 가운데 블록의 칸 i ↔ 블록 i의 가운데 칸은 같은 내용
+const blankMandal = () => ({ id: uid(), cells: Array.from({ length: 9 }, () => Array(9).fill('')) });
+let lastMandal = null;
+function renderMandals() {
+  const ms = data.mandals || (data.mandals = []);
+  $('mandal-empty').hidden = ms.length > 0;
+  $('mandal-list').innerHTML = ms.map((md, n) => {
+    const title = md.cells[4][4].trim();
+    let grid = '';
+    for (let b = 0; b < 9; b++) {
+      grid += `<div class="m-block${b === 4 ? ' core' : ''}">`;
+      for (let c = 0; c < 9; c++) {
+        const v = md.cells[b][c];
+        const cls = ['m-cell', c === 4 ? 'center' : '', b === 4 && c === 4 ? 'main' : '', v.length > 14 ? 'small' : ''].filter(Boolean).join(' ');
+        grid += `<div class="${cls}" contenteditable="plaintext-only" spellcheck="false" data-b="${b}" data-c="${c}" role="textbox" aria-label="${b === 4 && c === 4 ? '핵심 목표' : (b === 4 || c === 4) ? '세부 목표' : '실천 항목'}">${esc(v)}</div>`;
+      }
+      grid += '</div>';
+    }
+    return `<section class="mandal-wrap" data-mid="${esc(md.id)}">
+      <div class="mandal-bar"><b>${title ? esc(title) : `만다라트 ${n + 1}`}</b>
+        <span class="mandal-actions"><button type="button" class="btn small" data-mclear>내용 비우기</button><button type="button" class="btn small danger" data-mdel>삭제</button></span></div>
+      <div class="mandal">${grid}</div></section>`;
+  }).join('');
+  document.querySelectorAll('.m-cell').forEach((el) => { if (el.contentEditable !== 'plaintext-only') el.contentEditable = 'true'; });
+}
+const mandalOf = (el) => data.mandals.find((m) => m.id === el.closest('[data-mid]')?.dataset.mid);
+$('mandal-add').addEventListener('click', () => {
+  data.mandals.push(blankMandal()); commit(); renderMandals();
+  const last = document.querySelector('.mandal-wrap:last-child .m-block.core .m-cell.main');
+  last?.scrollIntoView({ behavior: 'smooth', block: 'center' }); last?.focus();
+});
+$('mandal-list').addEventListener('input', (e) => {
+  const el = e.target.closest('.m-cell'); if (!el) return;
+  const md = mandalOf(el); if (!md) return;
+  const b = Number(el.dataset.b), c = Number(el.dataset.c), v = el.innerText.replace(/\n+/g, ' ').slice(0, 100);
+  md.cells[b][c] = v;
+  // 세부 목표 자동 연결
+  let tb = -1, tc = -1;
+  if (b === 4 && c !== 4) { tb = c; tc = 4; } else if (c === 4 && b !== 4) { tb = 4; tc = b; }
+  if (tb >= 0) { md.cells[tb][tc] = v; const t = el.closest('.mandal').querySelector(`.m-cell[data-b="${tb}"][data-c="${tc}"]`); if (t) t.textContent = v; }
+  if (b === 4 && c === 4) el.closest('.mandal-wrap').querySelector('.mandal-bar b').textContent = v.trim() || '만다라트';
+  el.classList.toggle('small', v.length > 14);
+  commit();
+});
+$('mandal-list').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.closest('.m-cell')) { e.preventDefault(); e.target.blur(); } });
+$('mandal-list').addEventListener('paste', (e) => { if (!e.target.closest('.m-cell')) return; e.preventDefault(); document.execCommand('insertText', false, (e.clipboardData.getData('text') || '').replace(/\s+/g, ' ')); });
+$('mandal-list').addEventListener('click', (e) => {
+  const del = e.target.closest('[data-mdel]'), clr = e.target.closest('[data-mclear]');
+  if (!del && !clr) return;
+  const md = mandalOf(e.target); if (!md) return;
+  const name = md.cells[4][4].trim() || '이 만다라트';
+  const before = JSON.parse(JSON.stringify(data.mandals));
+  if (del) { if (!confirm(`"${name}"를 삭제할까요?`)) return; data.mandals = data.mandals.filter((m) => m !== md); }
+  else { if (!confirm(`"${name}"의 모든 칸을 비울까요?`)) return; md.cells = blankMandal().cells; }
+  lastMandal = before; commit(); renderMandals();
+  toast(del ? '만다라트를 삭제했어요' : '모든 칸을 비웠어요', '되돌리기', () => { if (!lastMandal) return; data.mandals = lastMandal; lastMandal = null; commit(); renderMandals(); toast('되돌렸어요'); });
+});
+
 /* ---------------- 시작 ---------------- */
 const saved = localStorage.getItem(ROOM_KEY);
 const planRoom = localStorage.getItem('myplan-room-name');   // 주간 플래너에서 쓰던 이름 (같은 사이트 주소라 공유됨)
 if (saved) { $('room-name').value = saved; cloud.open(saved); }
-else if (planRoom) { $('room-name').value = planRoom; $('login-status').textContent = '주간 플래너에서 쓰던 이름을 미리 넣어 뒀어요. 맞으면 [기록방 열기]를 누르세요.'; }
+else if (planRoom && document.getElementById('recent-rooms').hidden) { $('room-name').value = planRoom; $('login-status').textContent = '주간 플래너에서 쓰던 이름을 미리 넣어 뒀어요. 맞으면 [기록방 열기]를 누르세요.'; }
 })();

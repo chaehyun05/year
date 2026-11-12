@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="year.css?v=3">
+  <link rel="stylesheet" href="year.css?v=5">
 </head>
 <body>
   <div class="container">
@@ -35,6 +35,7 @@
         <input type="text" id="room-name" required minlength="2" maxlength="80" autocomplete="off" placeholder="예: 채현-주간플래너" aria-label="기록방 이름" aria-describedby="room-hint">
         <button class="btn primary" type="submit">기록방 열기</button>
       </form>
+      <div class="recent-rooms" id="recent-rooms" data-site="year" data-form="room-form" data-input="room-name" hidden></div>
       <p class="hint" id="room-hint">주간 플래너와 같은 이름을 쓰면 됩니다. 이름이 곧 열쇠라서, 이름을 아는 사람은 누구나 기록을 보고 고칠 수 있어요. 남이 짐작하기 어려운 8자 이상의 이름을 쓰세요.</p>
       <p class="status" id="login-status" role="status"></p>
     </section>
@@ -43,6 +44,8 @@
       <nav class="view-tabs" role="tablist" aria-label="화면">
         <button type="button" role="tab" id="tab-all" aria-selected="true">연도별 한눈에</button>
         <button type="button" role="tab" id="tab-year" aria-selected="false">연도 상세</button>
+        <button type="button" role="tab" id="tab-todo" aria-selected="false">할 일</button>
+        <button type="button" role="tab" id="tab-mandal" aria-selected="false">만다라트</button>
       </nav>
 
       <!-- 1. 연도별 한눈에 -->
@@ -80,6 +83,36 @@
         </div>
         <div class="progress" id="year-progress"></div>
         <div class="months" id="months"></div>
+      </section>
+
+      <!-- 3. 할 일 -->
+      <section class="card" id="view-todo" role="tabpanel" aria-labelledby="tab-todo" hidden>
+        <div class="table-header">
+          <h2>할 일 목록</h2>
+          <div class="actions">
+            <button type="button" class="btn" id="todo-clear-done">완료한 일 지우기</button>
+            <button type="button" class="btn danger ghost" id="todo-clear-all">전체 삭제</button>
+          </div>
+        </div>
+        <form class="item-add todo-add" id="todo-add"><input type="text" id="todo-input" maxlength="300" placeholder="할 일을 입력하고 Enter" aria-label="할 일 추가"><button class="btn primary" type="submit">추가</button></form>
+        <div class="todo-filter" role="group" aria-label="보기">
+          <button type="button" class="chip-btn" data-filter="all" aria-pressed="true">전체</button>
+          <button type="button" class="chip-btn" data-filter="open" aria-pressed="false">남은 일</button>
+          <button type="button" class="chip-btn" data-filter="done" aria-pressed="false">완료</button>
+          <span class="todo-count" id="todo-count"></span>
+        </div>
+        <ul class="items todo-items" id="todo-items"></ul>
+      </section>
+
+      <!-- 4. 만다라트 -->
+      <section class="card" id="view-mandal" role="tabpanel" aria-labelledby="tab-mandal" hidden>
+        <div class="table-header">
+          <h2>만다라트</h2>
+          <div class="actions"><button type="button" class="btn primary" id="mandal-add">＋ 만다라트 추가</button></div>
+        </div>
+        <p class="side-sub mandal-help">가운데 칸에 핵심 목표, 그 둘레 8칸에 세부 목표를 적으면 바깥 칸 가운데로 자동으로 옮겨져요. 칸을 눌러 바로 적으세요.</p>
+        <p class="empty-note" id="mandal-empty" hidden>아직 만다라트가 없어요. [＋ 만다라트 추가]를 눌러 시작하세요.</p>
+        <div id="mandal-list"></div>
       </section>
 
       <footer class="footer">
@@ -147,6 +180,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="supabase-config.js"></script>
-  <script src="year.js?v=4"></script>
+  <script src="rooms.js?v=1"></script>
+  <script src="year.js?v=5"></script>
 </body>
 </html>
