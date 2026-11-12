@@ -372,7 +372,15 @@ const cloud = (() => {
     } catch (e) { if (force) status('불러오기 실패: ' + e.message); }
   }
   const cacheKey = () => key && 'myyear-cache-' + key;
-  return { open, queue, refresh, cacheKey, get loaded() { return loaded; } };
+  async function remove(password) {
+    if (!loaded) throw Error('기록방이 열려 있지 않아요.');
+    clearTimeout(timer);
+    if (dirty && !blocked) await save();
+    await rpc('delete_shared_planner', { p_key: key, p_password: password, p_expected: revision });
+    dirty = false; loaded = false;
+    try { localStorage.removeItem(cacheKey()); } catch {}
+  }
+  return { open, queue, refresh, cacheKey, remove, get loaded() { return loaded; } };
 })();
 
 
@@ -726,6 +734,41 @@ $('mandal-list').addEventListener('click', (e) => {
   lastMandal = before; commit(); renderMandals();
   toast(del ? '만다라트를 삭제했어요' : '모든 칸을 비웠어요', '되돌리기', () => { if (!lastMandal) return; data.mandals = lastMandal; lastMandal = null; commit(); renderMandals(); toast('되돌렸어요'); });
 });
+
+/* ---------------- 기록방 나가기 · 완전 삭제 ---------------- */
+$('footer-leave').addEventListener('click', () => $('room-leave').click());
+function closeRoomDel() { $('room-del-modal').hidden = true; $('room-delete').focus(); }
+$('room-delete').addEventListener('click', () => {
+  $('room-del-name').textContent = `"${$('title-room').textContent}"`;
+  $('room-del-password').value = ''; $('room-del-error').textContent = '';
+  $('room-del-submit').disabled = false;
+  $('room-del-modal').hidden = false;
+  setTimeout(() => $('room-del-password').focus(), 30);
+});
+$('room-del-backup').addEventListener('click', () => $('backup-save').click());
+$('room-del-cancel').addEventListener('click', closeRoomDel);
+$('room-del-modal').addEventListener('click', (e) => { if (e.target === $('room-del-modal')) closeRoomDel(); });
+$('room-del-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pw = $('room-del-password').value; if (!pw) return;
+  const name = $('title-room').textContent;
+  if (!confirm(`"${name}" 기록방의 연도 계획을 정말 모두 지울까요?`)) return;
+  $('room-del-submit').disabled = true; $('room-del-error').textContent = '';
+  try {
+    await cloud.remove(pw);
+    try { localStorage.removeItem(ROOM_KEY); localStorage.removeItem(DATA_KEY); } catch {}
+    window.MyRooms?.dropSite?.(name, 'year');
+    alert('기록방을 삭제했어요. 같은 이름으로 다시 들어가면 빈 기록으로 시작해요.');
+    location.hash = ''; location.reload();
+  } catch (err) {
+    const m = err.message || '';
+    $('room-del-error').textContent = m.includes('WRONG_PASSWORD') ? '비밀번호가 틀렸어요.'
+      : m.includes('CONFLICT') ? '다른 기기에서 먼저 바뀌었어요. [최신 기록 불러오기] 후 다시 시도하세요.'
+      : '삭제하지 못했어요: ' + m;
+    $('room-del-submit').disabled = false;
+  }
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('room-del-modal').hidden) closeRoomDel(); });
 
 /* ---------------- 시작 ---------------- */
 const saved = localStorage.getItem(ROOM_KEY);

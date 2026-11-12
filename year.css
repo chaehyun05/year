@@ -295,3 +295,14 @@ textarea:focus,input:focus{outline:2px solid var(--cobalt);outline-offset:0;bord
   .recent-open{padding:12px}
   .recent-del{flex-basis:48px}
 }
+
+/* 기록방 나가기 · 완전 삭제 */
+.footer-actions{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.room-del-form{display:flex;flex-direction:column;gap:10px}
+.room-del-form h3{color:var(--danger)}
+.del-note{margin:0;font-size:13px;color:var(--muted)}
+.pw-input{min-height:44px;padding:8px 12px;border:1px solid #cdd4e5;border-radius:10px;font-size:16px}
+.form-error{margin:0;color:var(--danger);font-size:13px;font-weight:600}
+.form-error:empty{display:none}
+#room-del-modal{z-index:115}
+@media(max-width:640px){.footer-actions{margin-left:0;width:100%}.footer-actions .btn{flex:1;min-height:38px}}

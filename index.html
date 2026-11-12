@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="year.css?v=5">
+  <link rel="stylesheet" href="year.css?v=6">
 </head>
 <body>
   <div class="container">
@@ -118,6 +118,10 @@
       <footer class="footer">
         <span id="cloud-status" role="status">클라우드 연결 전</span>
         <button type="button" class="btn small" id="cloud-reload" hidden>최신 기록 불러오기</button>
+        <span class="footer-actions">
+          <button type="button" class="btn small" id="footer-leave">기록방 나가기</button>
+          <button type="button" class="btn small danger ghost" id="room-delete">기록방 완전 삭제</button>
+        </span>
       </footer>
     </main>
   </div>
@@ -176,11 +180,30 @@
       </div>
     </div>
   </div>
+  <!-- 기록방 완전 삭제 -->
+  <div class="modal-backdrop" id="room-del-modal" hidden>
+    <div class="modal small-modal" role="dialog" aria-modal="true" aria-labelledby="room-del-title">
+      <form id="room-del-form" class="room-del-form">
+        <h3 id="room-del-title">기록방 완전 삭제</h3>
+        <p class="del-desc"><b id="room-del-name"></b> 기록방의 <b>연도 계획 · 할 일 · 만다라트</b>를 모두 지워요. 되돌릴 수 없으니 필요하면 먼저 백업 파일을 저장하세요.</p>
+        <p class="del-note">같은 이름의 주간 플래너(plan) 기록은 지워지지 않아요.</p>
+        <button type="button" class="btn" id="room-del-backup">백업 파일 먼저 저장</button>
+        <label class="memo-label" for="room-del-password">삭제 비밀번호 <small>주간 플래너와 같은 비밀번호</small></label>
+        <input type="password" id="room-del-password" class="pw-input" inputmode="numeric" autocomplete="off" required>
+        <p class="form-error" id="room-del-error" role="alert"></p>
+        <div class="modal-buttons">
+          <button type="button" class="btn" id="room-del-cancel">취소</button>
+          <button type="submit" class="btn danger" id="room-del-submit">삭제</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="sel-tip" id="sel-tip" hidden></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="supabase-config.js"></script>
-  <script src="rooms.js?v=1"></script>
-  <script src="year.js?v=5"></script>
+  <script src="rooms.js?v=2"></script>
+  <script src="year.js?v=6"></script>
 </body>
 </html>

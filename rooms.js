@@ -45,6 +45,15 @@
     save(list);
     render();
   }
+  // 한 사이트에서 기록방을 완전 삭제했을 때: 그 사이트 표시만 빼고, 남은 사이트가 없으면 목록에서 뺌
+  function dropSite(name, s) {
+    const list = load();
+    const r = list.find((x) => x.name === name);
+    if (!r) return;
+    r.sites = (r.sites || []).filter((x) => x !== (SITE_LABEL[s] || s));
+    save(r.sites.length ? list : list.filter((x) => x !== r));
+    render();
+  }
   function forget(name) {
     save(load().filter((r) => r.name !== name));
     render();
@@ -89,6 +98,6 @@
     input.value = r.name;
     if (form.requestSubmit) form.requestSubmit(); else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
   });
-  window.MyRooms = { remember, forget, render };
+  window.MyRooms = { remember, forget, dropSite, render };
   render();
 })();
