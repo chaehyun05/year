@@ -356,6 +356,7 @@ const cloud = (() => {
       window.MyRooms?.remember(name);
       route();
       if (dirty) save();
+      runLinkImport();
     } catch (e) {
       $('login-status').textContent = '열지 못했어요: ' + e.message;
     } finally { btn.disabled = false; }
@@ -609,16 +610,20 @@ function applyPatch(p) {
   commit(); renderAll(); toast(`${added}개를 추가했어요`);
 }
 $('backup-load').addEventListener('click', () => { $('backup-file').click(); $('more-tools').open = false; });
-$('backup-file').addEventListener('change', async (e) => {
-  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+// 백업 파일·계획 추가 파일·링크 모두 이 함수로 불러와요.
+async function importText(text) {
   try {
-    const raw = JSON.parse(await f.text());
+    const raw = JSON.parse(text);
     if (raw?.kind === 'myyear-patch') { applyPatch(raw); return; }
     const d = validate(raw);
     if (!d) throw Error();
     if (!confirm('백업 파일로 지금 기록을 바꿀까요? 현재 내용은 사라져요.')) return;
     data = d; commit(); renderAll(); toast('백업을 불러왔어요');
   } catch { alert('올바른 연도 계획 백업 파일이 아니에요.'); }
+}
+$('backup-file').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  importText(await f.text());
 });
 $('room-leave').addEventListener('click', () => { if (!confirm('이 기기에서 기록방을 나갈까요? 기록은 클라우드에 그대로 남아요.')) return; localStorage.removeItem(ROOM_KEY); localStorage.removeItem(DATA_KEY); location.hash = ''; location.reload(); });
 $('cloud-reload').addEventListener('click', () => {
@@ -770,8 +775,35 @@ $('room-del-form').addEventListener('submit', async (e) => {
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('room-del-modal').hidden) closeRoomDel(); });
 
+/* ---------------- 링크로 불러오기 ----------------
+   주소 끝에 #import=<내용>&room=<기록방 이름> 을 붙여 열면, 그 기록방을 열고 내용을 불러와요.
+   <내용> = JSON을 gzip으로 압축한 뒤 base64url로 바꾼 글자. 서버로 전송되지 않는 # 뒤에만 있어요.
+   불러오기 전에 항상 확인 창이 떠요. */
+const linkImport = (() => {
+  const m = /^#import=([A-Za-z0-9_-]+)(?:&room=([^&]*))?$/.exec(location.hash);
+  if (!m) return null;
+  history.replaceState(null, '', location.pathname + location.search);
+  let room = null;
+  try { room = m[2] ? decodeURIComponent(m[2]).normalize('NFC').trim() : null; } catch {}
+  return { data: m[1], room: room || null, done: false };
+})();
+async function linkText(b64) {
+  let s = b64.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  return await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+}
+async function runLinkImport() {
+  if (!linkImport || linkImport.done) return;
+  linkImport.done = true;
+  let text;
+  try { text = await linkText(linkImport.data); } catch { alert('링크의 계획을 읽지 못했어요. 파일로 불러와 주세요.'); return; }
+  importText(text);
+}
+
 /* ---------------- 시작 ---------------- */
-const saved = localStorage.getItem(ROOM_KEY);
+const saved = linkImport?.room || localStorage.getItem(ROOM_KEY);
+if (linkImport && !saved) $('login-status').textContent = '기록방을 열면 링크의 계획을 불러와요.';
 const planRoom = localStorage.getItem('myplan-room-name');   // 주간 플래너에서 쓰던 이름 (같은 사이트 주소라 공유됨)
 if (saved) { $('room-name').value = saved; cloud.open(saved); }
 else if (planRoom && document.getElementById('recent-rooms').hidden) { $('room-name').value = planRoom; $('login-status').textContent = '주간 플래너에서 쓰던 이름을 미리 넣어 뒀어요. 맞으면 [기록방 열기]를 누르세요.'; }
