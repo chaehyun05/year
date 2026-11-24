@@ -178,8 +178,8 @@
           <button type="button" class="recent-link" data-act="resync">지금 맞추기</button><button type="button" class="recent-link" data-act="off">이 기기에서 끄기</button></div>`
       : showSetup
         ? `<form class="recent-sync setup" data-act="form">
-            <p><b>모든 기기에서 같은 목록 보기</b><br>회사 노트북·폰·개인 노트북에 <b>똑같은 목록 이름</b>을 한 번씩 넣으면 어디서 연 기록방이든 여기 모여요. 아이디처럼 쓰는 이름이라 남이 짐작하기 어려운 8자 이상으로 정하세요.</p>
-            <div class="recent-sync-row"><input type="text" name="n" minlength="8" maxlength="80" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="목록 이름 (8자 이상)" aria-label="목록 이름"><button type="submit" class="btn primary">연결</button><button type="button" class="btn" data-act="cancel">취소</button></div>
+            <p><b>모든 기기에서 같은 목록 보기</b><br>회사 노트북·폰·개인 노트북에 <b>똑같은 목록 이름</b>을 한 번씩 넣으면 어디서 연 기록방이든 여기 모여요. 아이디처럼 쓰는 이름이라 남이 짐작하기 어려운 이름이 좋아요.</p>
+            <div class="recent-sync-row"><input type="text" name="n" required maxlength="80" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="목록 이름" aria-label="목록 이름"><button type="submit" class="btn primary">연결</button><button type="button" class="btn" data-act="cancel">취소</button></div>
           </form>`
         : `<button type="button" class="recent-sync-btn" data-act="setup">☁ 다른 기기에서도 이 목록 보기</button>`;
     box.innerHTML = head + items + syncPart + (syncMsg ? `<p class="recent-err" role="alert">${esc(syncMsg)}</p>` : '');
@@ -215,7 +215,7 @@
     if (!e.target.closest('[data-act=form]')) return;
     e.preventDefault();
     const n = (e.target.elements.n.value || '').normalize('NFC').trim();
-    if (n.length < 8) { syncMsg = '목록 이름은 8자 이상으로 정하세요.'; render(); showSetup = true; render(); return; }
+    if (!n) { e.target.elements.n.focus(); return; }
     set(SYNC, n); showSetup = false; syncMsg = '';
     render();
     await sync();
