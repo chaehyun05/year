@@ -11,8 +11,9 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 /* ---------------- 데이터 ---------------- */
+const BLOCK_COLORS = ['#2340E8', '#F06A2C', '#10A37F', '#E5487D', '#7A4FE0', '#E0A800', '#0EA5C6', '#6B7280'];
 function blank() {
-  return { kind: 'myyear', version: 1, years: [0,1,2,3,4].map((i) => THIS_YEAR + i), plans: {}, todos: [], mandals: [] };
+  return { kind: 'myyear', version: 1, years: [0,1,2,3,4].map((i) => THIS_YEAR + i), plans: {}, todos: [], mandals: [], blocks: [] };
 }
 function validate(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -39,7 +40,10 @@ function validate(raw) {
     id: typeof md?.id === 'string' ? md.id : uid(),
     cells: Array.from({ length: 9 }, (_, b) => Array.from({ length: 9 }, (_, c) => { const v = md?.cells?.[b]?.[c]; return typeof v === 'string' ? v.slice(0, 100) : ''; })),
   }));
-  return { kind: 'myyear', version: 1, years, plans, todos, mandals };
+  const DRE = /^\d{4}-\d{2}-\d{2}$/;
+  const blocks = (Array.isArray(raw.blocks) ? raw.blocks : []).filter((b) => b && typeof b.text === 'string' && DRE.test(b.from) && DRE.test(b.to)).slice(0, 500)
+    .map((b) => ({ id: typeof b.id === 'string' ? b.id : uid(), text: b.text.slice(0, 60), from: b.from <= b.to ? b.from : b.to, to: b.from <= b.to ? b.to : b.from, color: BLOCK_COLORS.includes(b.color) ? b.color : BLOCK_COLORS[0] }));
+  return { kind: 'myyear', version: 1, years, plans, todos, mandals, blocks };
 }
 let data = blank();
 const plan = (y) => (data.plans[y] ||= { goal: '', months: {}, memos: {} });
@@ -71,7 +75,7 @@ function renderOverview() {
       const list = data.plans[y]?.months[m] || [];
       const memo = data.plans[y]?.memos[m] || '';
       const shown = list.slice(0, 4);
-      let inner = '';
+      let inner = blockMini(y, m);
       if (shown.length) inner += '<ul>' + shown.map((it) => `<li class="${it.done ? 'done' : ''}">${esc(it.text)}</li>`).join('') + '</ul>';
       if (list.length > 4) inner += `<span class="more">+${list.length - 4}개 더</span>`;
       if (memo) inner += `<span class="memo-dot">메모 · ${esc(memo.split('\n')[0])}</span>`;
@@ -111,6 +115,7 @@ function renderYear() {
     const now = y === THIS_YEAR && m === THIS_MONTH;
     return `<section class="month${now ? ' now' : ''}" aria-label="${m}월">
       <div class="month-head"><b>${m}</b><span>월</span>${list.length ? `<small>${done}/${list.length}</small>` : ''}</div>
+      ${timelineHtml(y, m)}
       <ul class="items">${list.map((it) => itemHtml(it, y, m)).join('')}</ul>
       <form class="item-add" data-y="${y}" data-m="${m}"><input type="text" maxlength="200" placeholder="계획 추가" aria-label="${m}월 계획 추가"><button class="btn" type="submit">추가</button></form>
       <textarea data-memo-y="${y}" data-memo-m="${m}" rows="2" placeholder="메모" aria-label="${m}월 메모">${esc(p?.memos[m] || '')}</textarea>
@@ -132,6 +137,7 @@ function renderCell() {
   if (!modal) return;
   const { y, m } = modal;
   $('cell-items').innerHTML = (data.plans[y]?.months[m] || []).map((it) => itemHtml(it, y, m)).join('');
+  $('cell-blocks').innerHTML = timelineHtml(y, m);
 }
 function closeCell() {
   if (!modal) return;
@@ -238,6 +244,128 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && pendingDel) { closeDel(); return; }
   if (e.key === 'Escape' && modal) closeCell();
   if (e.key === 'Escape' && multi) closeMulti();
+});
+
+/* ---------------- 기간 블록 (예: 12.1~12.17 기말고사, 12.18~12.31 여행) ---------------- */
+const p2 = (n) => String(n).padStart(2, '0');
+const dkey = (y, m, d) => `${y}-${p2(m)}-${p2(d)}`;
+const dim = (y, m) => new Date(y, m, 0).getDate();               // m: 1~12
+const dparse = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const dshort = (k) => { const d = dparse(k); return `${d.getMonth() + 1}.${d.getDate()}`; };
+const daysBetween = (a, b) => Math.round((dparse(b) - dparse(a)) / 86400000) + 1;
+const blocksIn = (y, m) => {
+  const s = dkey(y, m, 1), e = dkey(y, m, dim(y, m));
+  return (data.blocks || []).filter((b) => b.from <= e && b.to >= s).sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : a.to < b.to ? -1 : 1));
+};
+// 겹치는 블록은 줄을 나눠서 그림
+function lanesFor(y, m) {
+  const last = dim(y, m), s = dkey(y, m, 1), e = dkey(y, m, last), lanes = [];
+  for (const b of blocksIn(y, m)) {
+    const d1 = b.from < s ? 1 : dparse(b.from).getDate(), d2 = b.to > e ? last : dparse(b.to).getDate();
+    const seg = { b, d1, d2, cutL: b.from < s, cutR: b.to > e };
+    let lane = lanes.find((l) => l[l.length - 1].d2 < d1);
+    if (!lane) { lane = []; lanes.push(lane); }
+    lane.push(seg);
+  }
+  return { lanes, last };
+}
+const rangeLabel = (b) => (b.from === b.to ? dshort(b.from) : `${dshort(b.from)} ~ ${dshort(b.to)}`);
+function timelineHtml(y, m) {
+  const { lanes, last } = lanesFor(y, m);
+  const pct = (d) => ((d - 1) / last) * 100;
+  const today = new Date(), isNow = today.getFullYear() === y && today.getMonth() + 1 === m;
+  const bars = lanes.map((lane) => `<div class="tl-lane">${lane.map(({ b, d1, d2, cutL, cutR }) =>
+    `<button type="button" class="tl-seg${cutL ? ' cut-l' : ''}${cutR ? ' cut-r' : ''}" data-bid="${esc(b.id)}" style="left:${pct(d1)}%;width:${((d2 - d1 + 1) / last) * 100}%;--c:${b.color}" title="${esc(b.text)} · ${rangeLabel(b)}" aria-label="${esc(b.text)} ${rangeLabel(b)}, 편집"><span>${esc(b.text)}</span></button>`).join('')}</div>`).join('');
+  const ticks = [1, 10, 20, last].map((d) => `<span style="left:${pct(d)}%">${d}</span>`).join('');
+  return `<div class="timeline" data-y="${y}" data-m="${m}">
+    <div class="tl-head"><span class="memo-label">기간 블록</span><button type="button" class="tl-add" data-add-block data-y="${y}" data-m="${m}">＋ 기간 블록</button></div>
+    ${lanes.length ? `<div class="tl-track">${bars}${isNow ? `<i class="tl-today" style="left:${((today.getDate() - 0.5) / last) * 100}%" title="오늘"></i>` : ''}</div><div class="tl-ticks" aria-hidden="true">${ticks}</div>
+    <ul class="tl-list">${blocksIn(y, m).map((b) => `<li><button type="button" data-bid="${esc(b.id)}"><i style="background:${b.color}"></i><b>${esc(b.text)}</b><span>${rangeLabel(b)} · ${daysBetween(b.from, b.to)}일</span></button></li>`).join('')}</ul>`
+    : `<p class="tl-empty">날짜 구간으로 나눠 계획하려면 ＋ 기간 블록을 누르세요.</p>`}
+  </div>`;
+}
+// 한눈에 보기 칸 안의 작은 막대
+function blockMini(y, m) {
+  const { lanes, last } = lanesFor(y, m);
+  if (!lanes.length) return '';
+  const bars = lanes.slice(0, 3).map((lane) => `<span class="mini-lane">${lane.map(({ b, d1, d2 }) => `<i style="left:${((d1 - 1) / last) * 100}%;width:${((d2 - d1 + 1) / last) * 100}%;background:${b.color}"></i>`).join('')}</span>`).join('');
+  const labels = blocksIn(y, m).slice(0, 3).map((b) => {
+    const s = dkey(y, m, 1), e = dkey(y, m, last);
+    const d1 = b.from < s ? 1 : dparse(b.from).getDate(), d2 = b.to > e ? last : dparse(b.to).getDate();
+    return `<span class="mini-label"><i style="background:${b.color}"></i>${d1 === 1 && d2 === last ? '' : `${d1}~${d2}일 `}${esc(b.text)}</span>`;
+  }).join('');
+  return `<span class="mini-tl">${bars}</span>${labels}`;
+}
+
+let blockEdit = null, blockColor = BLOCK_COLORS[0], lastBlock = null;
+function openBlock(opts) {
+  // opts: { id } 편집 · { y, m } 새로 (그 달 1일~말일) · { from, to } 새로
+  const b = opts.id ? data.blocks.find((x) => x.id === opts.id) : null;
+  blockEdit = { id: b ? b.id : null, back: document.activeElement };
+  $('block-title').textContent = b ? '기간 블록 고치기' : '기간 블록 추가';
+  $('block-text').value = b ? b.text : '';
+  $('block-from').value = b ? b.from : opts.from || dkey(opts.y, opts.m, 1);
+  $('block-to').value = b ? b.to : opts.to || dkey(opts.y, opts.m, dim(opts.y, opts.m));
+  blockColor = b ? b.color : opts.color || BLOCK_COLORS[(data.blocks.length) % BLOCK_COLORS.length];
+  $('block-delete').hidden = !b;
+  $('block-error').textContent = '';
+  blockPreview();
+  $('block-modal').hidden = false;
+  setTimeout(() => { $('block-text').focus(); $('block-text').select(); }, 30);
+}
+function blockPreview() {
+  $('block-colors').innerHTML = BLOCK_COLORS.map((c) => `<button type="button" class="swatch" data-color="${c}" style="background:${c}" aria-label="색 ${c}" aria-pressed="${c === blockColor}"></button>`).join('');
+  const f = $('block-from').value, t = $('block-to').value;
+  $('block-len').textContent = f && t ? (t < f ? '끝 날짜가 시작보다 빨라요.' : `${dshort(f)} ~ ${dshort(t)} · ${daysBetween(f, t)}일`) : '';
+}
+function closeBlock() { const b = blockEdit?.back; blockEdit = null; $('block-modal').hidden = true; if (b && document.body.contains(b)) b.focus?.(); }
+function saveBlock() {
+  const text = $('block-text').value.trim(), from = $('block-from').value, to = $('block-to').value;
+  if (!text) { $('block-error').textContent = '무엇을 하는지 적어 주세요.'; $('block-text').focus(); return null; }
+  if (!from || !to) { $('block-error').textContent = '시작과 끝 날짜를 골라 주세요.'; return null; }
+  if (to < from) { $('block-error').textContent = '끝 날짜가 시작보다 빨라요.'; $('block-to').focus(); return null; }
+  if (daysBetween(from, to) > 366) { $('block-error').textContent = '한 블록은 1년(366일)까지예요.'; return null; }
+  data.blocks ||= [];
+  let b = blockEdit.id && data.blocks.find((x) => x.id === blockEdit.id);
+  if (b) Object.assign(b, { text, from, to, color: blockColor });
+  else { b = { id: uid(), text, from, to, color: blockColor }; data.blocks.push(b); }
+  // 블록이 있는 연도가 표에 없으면 추가
+  for (const yy of [dparse(from).getFullYear(), dparse(to).getFullYear()]) if (!data.years.includes(yy)) { data.years.push(yy); data.years.sort((a, c) => a - c); }
+  commit(); renderAll(); renderCell();
+  return b;
+}
+$('block-form').addEventListener('submit', (e) => { e.preventDefault(); if (saveBlock()) { closeBlock(); toast('기간 블록을 저장했어요'); } });
+$('block-next').addEventListener('click', () => {
+  const b = saveBlock(); if (!b) return;
+  // 끝난 다음 날부터, 그 달 말일까지 (말일에 끝났으면 다음 달 말일까지)
+  const n = dparse(b.to); n.setDate(n.getDate() + 1);
+  const y = n.getFullYear(), m = n.getMonth() + 1;
+  const nextColor = BLOCK_COLORS[(BLOCK_COLORS.indexOf(b.color) + 1) % BLOCK_COLORS.length];
+  toast(`"${b.text}" 저장 · 다음 블록을 적어 주세요`);
+  openBlock({ from: dkey(y, m, n.getDate()), to: dkey(y, m, dim(y, m)), color: nextColor });
+});
+$('block-delete').addEventListener('click', () => {
+  const b = data.blocks.find((x) => x.id === blockEdit?.id); if (!b) return;
+  const before = data.blocks.slice();
+  data.blocks = data.blocks.filter((x) => x !== b);
+  commit(); closeBlock(); renderAll(); renderCell();
+  lastBlock = before;
+  toast(`"${b.text}" 블록을 지웠어요`, '되돌리기', () => { if (!lastBlock) return; data.blocks = lastBlock; lastBlock = null; commit(); renderAll(); renderCell(); });
+});
+$('block-colors').addEventListener('click', (e) => { const s = e.target.closest('[data-color]'); if (!s) return; blockColor = s.dataset.color; blockPreview(); });
+['block-from', 'block-to'].forEach((id) => $(id).addEventListener('input', () => {
+  if (id === 'block-from' && $('block-to').value && $('block-to').value < $('block-from').value) $('block-to').value = $('block-from').value;
+  blockPreview();
+}));
+$('block-close').addEventListener('click', closeBlock);
+$('block-modal').addEventListener('click', (e) => { if (e.target === $('block-modal')) closeBlock(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('block-modal').hidden) closeBlock(); });
+// 달 카드·칸 팝업 어디서든: 블록 누르면 편집, ＋ 누르면 추가
+document.addEventListener('click', (e) => {
+  const seg = e.target.closest('.timeline [data-bid]');
+  if (seg) { e.preventDefault(); return openBlock({ id: seg.dataset.bid }); }
+  const add = e.target.closest('[data-add-block]');
+  if (add) { e.preventDefault(); openBlock({ y: Number(add.dataset.y), m: Number(add.dataset.m) }); }
 });
 
 /* ---------------- 화면 전환 ---------------- */

@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="year.css?v=8">
+  <link rel="stylesheet" href="year.css?v=10">
 </head>
 <body>
   <div class="container">
@@ -134,6 +134,7 @@
         <h3 id="cell-title">2026년 1월</h3>
         <button type="button" class="btn icon" id="cell-close" aria-label="닫기">×</button>
       </div>
+      <div class="cell-blocks" id="cell-blocks"></div>
       <ul class="items" id="cell-items"></ul>
       <form class="item-add" id="cell-add"><input type="text" id="cell-input" maxlength="200" placeholder="계획을 입력하고 Enter" aria-label="계획 추가"><button class="btn primary" type="submit">추가</button></form>
       <label class="memo-label" for="cell-memo">메모</label>
@@ -170,6 +171,30 @@
 
   <input type="file" id="backup-file" accept="application/json,.json" hidden>
   <!-- 같이 넣은 계획 지우기 -->
+  <!-- 기간 블록 -->
+  <div class="modal-backdrop" id="block-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="block-title">
+      <form id="block-form" class="block-form" autocomplete="off">
+        <div class="modal-head"><h3 id="block-title">기간 블록</h3><button type="button" class="btn icon" id="block-close" aria-label="닫기">×</button></div>
+        <label class="memo-label" for="block-text">무엇을 하나요?</label>
+        <input type="text" id="block-text" class="pw-input" maxlength="60" placeholder="예: 기말고사 준비, 제주 여행, 방학" required>
+        <div class="block-dates">
+          <label><span class="memo-label">시작</span><input type="date" id="block-from" class="pw-input" required></label>
+          <span class="block-dash">~</span>
+          <label><span class="memo-label">끝</span><input type="date" id="block-to" class="pw-input" required></label>
+        </div>
+        <p class="block-len" id="block-len" aria-live="polite"></p>
+        <div class="block-colors" id="block-colors" role="group" aria-label="색"></div>
+        <p class="form-error" id="block-error" role="alert"></p>
+        <div class="modal-buttons block-buttons">
+          <button type="button" class="btn danger ghost" id="block-delete" hidden>삭제</button>
+          <button type="button" class="btn" id="block-next">저장하고 이어서 다음 블록</button>
+          <button type="submit" class="btn primary" id="block-save">저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="del-modal" hidden>
     <div class="modal small-modal" role="dialog" aria-modal="true" aria-labelledby="del-title">
       <h3 id="del-title">어디까지 지울까요?</h3>
@@ -205,6 +230,6 @@
 
   <script src="supabase-config.js"></script>
   <script src="rooms.js?v=6"></script>
-  <script src="year.js?v=7"></script>
+  <script src="year.js?v=blocks1"></script>
 </body>
 </html>
