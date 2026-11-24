@@ -62,13 +62,11 @@
     render();
     sync();
   }
-  // 한 사이트에서 기록방을 완전 삭제했을 때: 그 사이트 표시만 빼고, 남은 사이트가 없으면 목록에서 뺌
-  function dropSite(name, s) {
-    const list = load();
-    const r = list.find((x) => x.name === name);
-    if (!r) return;
-    r.sites = r.sites.filter((x) => x !== (SITE_LABEL[s] || s));
-    if (r.sites.length) { save(list); render(); sync(); } else forget(name);
+  // 기록방을 완전 삭제했을 때: 목록에서 바로 빼고, 동기화 중이면 다른 기기 목록에서도 빠지게 표시
+  // (같은 이름을 plan·year 둘 다에서 썼어도 목록에서는 뺌 — 남은 쪽 기록은 이름을 다시 입력하면 열 수 있음)
+  function dropSite(name) {
+    name = String(name || '').normalize('NFC').trim();
+    if (name) forget(name);
   }
 
   /* ---------- 서버 동기화 ---------- */
