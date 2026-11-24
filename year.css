@@ -306,3 +306,20 @@ textarea:focus,input:focus{outline:2px solid var(--cobalt);outline-offset:0;bord
 .form-error:empty{display:none}
 #room-del-modal{z-index:115}
 @media(max-width:640px){.footer-actions{margin-left:0;width:100%}.footer-actions .btn{flex:1;min-height:38px}}
+
+/* 기록방 목록 동기화 (rooms.js) */
+.recent-none{margin:4px 0 10px;font-size:13px;color:#9DA1B8;}
+.recent-sync-btn{margin-top:10px;padding:8px 12px;border:1px dashed #B9C2EA;border-radius:10px;background:#F7F8FF;font:inherit;font-size:13px;font-weight:700;color:#2340E8;cursor:pointer;width:100%;text-align:left;}
+.recent-sync-btn:hover{background:#EEF1FF;}
+.recent-sync{margin-top:10px;font-size:13px;color:#4a5369;}
+.recent-sync.on{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border-radius:10px;background:#EEF1FF;}
+.recent-sync.on b{letter-spacing:1px;}
+.recent-link{border:0;background:none;padding:2px 0;font:inherit;font-size:12.5px;font-weight:700;color:#2340E8;text-decoration:underline;cursor:pointer;}
+.recent-link[data-act=off]{color:#6A6F8E;}
+.recent-sync.setup{padding:12px;border:1px solid #C9D0EA;border-radius:12px;background:#F7F8FF;}
+.recent-sync.setup p{margin:0 0 10px;line-height:1.6;}
+.recent-sync-row{display:flex;gap:8px;flex-wrap:wrap;}
+.recent-sync-row input{flex:1 1 200px;min-height:42px;padding:0 12px;border:1px solid #cdd4e5;border-radius:10px;font:inherit;font-size:16px;background:#fff;}
+.recent-show{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:#6A6F8E;}
+.recent-err{margin:8px 0 0;font-size:12.5px;font-weight:700;color:#C62F3A;}
+
