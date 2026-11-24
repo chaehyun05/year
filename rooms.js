@@ -174,13 +174,12 @@
             <button type="button" class="recent-del" data-i="${i}" aria-label="${esc(r.name)} 목록에서 빼기" title="목록에서 빼기 (기록은 그대로)">×</button></li>`).join('')}
       </ul>` : `<p class="recent-none">${syncName ? '아직 목록이 비어 있어요. 기록방을 열면 여기에 모여요.' : '아직 연 기록방이 없어요.'}</p>`;
     const syncPart = syncName
-      ? `<div class="recent-sync on"><span>목록 이름: <b>${esc(syncName.length > 3 ? syncName.slice(0, 2) + '•'.repeat(Math.min(6, syncName.length - 2)) : '•••')}</b></span>
+      ? `<div class="recent-sync on"><span>목록 이름: <b>${esc(syncName)}</b></span>
           <button type="button" class="recent-link" data-act="resync">지금 맞추기</button><button type="button" class="recent-link" data-act="off">이 기기에서 끄기</button></div>`
       : showSetup
         ? `<form class="recent-sync setup" data-act="form">
             <p><b>모든 기기에서 같은 목록 보기</b><br>회사 노트북·폰·개인 노트북에 <b>똑같은 목록 이름</b>을 한 번씩 넣으면 어디서 연 기록방이든 여기 모여요. 아이디처럼 쓰는 이름이라 남이 짐작하기 어려운 8자 이상으로 정하세요.</p>
-            <div class="recent-sync-row"><input type="password" name="n" minlength="8" maxlength="80" autocomplete="off" placeholder="목록 이름 (8자 이상)" aria-label="목록 이름"><button type="submit" class="btn primary">연결</button><button type="button" class="btn" data-act="cancel">취소</button></div>
-            <label class="recent-show"><input type="checkbox" data-act="show"> 글자 보기</label>
+            <div class="recent-sync-row"><input type="text" name="n" minlength="8" maxlength="80" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="목록 이름 (8자 이상)" aria-label="목록 이름"><button type="submit" class="btn primary">연결</button><button type="button" class="btn" data-act="cancel">취소</button></div>
           </form>`
         : `<button type="button" class="recent-sync-btn" data-act="setup">☁ 다른 기기에서도 이 목록 보기</button>`;
     box.innerHTML = head + items + syncPart + (syncMsg ? `<p class="recent-err" role="alert">${esc(syncMsg)}</p>` : '');
@@ -191,7 +190,6 @@
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'setup') { showSetup = true; render(); box.querySelector('input[name=n]')?.focus(); return; }
     if (act === 'cancel') { showSetup = false; render(); return; }
-    if (act === 'show') { const i = box.querySelector('input[name=n]'); if (i) i.type = e.target.checked ? 'text' : 'password'; return; }
     if (act === 'resync') { sync(); render(); return; }
     if (act === 'off') {
       if (!confirm('이 기기에서 목록 동기화를 끌까요?\n목록은 이 기기에 그대로 남고, 서버의 목록도 지워지지 않아요.')) return;
