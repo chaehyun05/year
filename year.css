@@ -323,3 +323,10 @@ textarea:focus,input:focus{outline:2px solid var(--cobalt);outline-offset:0;bord
 .recent-show{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:#6A6F8E;}
 .recent-err{margin:8px 0 0;font-size:12.5px;font-weight:700;color:#C62F3A;}
 
+
+/* plan으로 가는 버튼 (plan의 YEAR 버튼과 같은 모양) */
+.site-links{display:flex;gap:8px;margin:-12px 0 18px}
+.site-links a{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:999px;border:1px solid #DCDFEA;background:#fff;color:#2340E8;font-size:13px;font-weight:700;text-decoration:none}
+.site-links a:hover{border-color:#2340E8;background:#EEF1FF}
+.site-links a:focus-visible{outline:2px solid #2340E8;outline-offset:2px}
+@media(max-width:640px){.site-links{margin:-4px 0 12px}}
