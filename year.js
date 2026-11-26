@@ -7,6 +7,8 @@ const NOW = new Date();
 const THIS_YEAR = NOW.getFullYear();
 const THIS_MONTH = NOW.getMonth() + 1;
 const MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12];
+// 체크한 항목은 목록 맨 아래로 (안 한 것 먼저, 원래 순서 유지)
+const doneLast = (arr) => [...arr.filter((x) => !x.done), ...arr.filter((x) => x.done)];
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -74,7 +76,7 @@ function renderOverview() {
     for (const y of ys) {
       const list = data.plans[y]?.months[m] || [];
       const memo = data.plans[y]?.memos[m] || '';
-      const shown = list.slice(0, 4);
+      const shown = doneLast(list).slice(0, 4);
       let inner = blockMini(y, m);
       if (shown.length) inner += '<ul>' + shown.map((it) => `<li class="${it.done ? 'done' : ''}">${esc(it.text)}</li>`).join('') + '</ul>';
       if (list.length > 4) inner += `<span class="more">+${list.length - 4}개 더</span>`;
@@ -116,7 +118,7 @@ function renderYear() {
     return `<section class="month${now ? ' now' : ''}" aria-label="${m}월">
       <div class="month-head"><b>${m}</b><span>월</span>${list.length ? `<small>${done}/${list.length}</small>` : ''}</div>
       ${timelineHtml(y, m)}
-      <ul class="items">${list.map((it) => itemHtml(it, y, m)).join('')}</ul>
+      <ul class="items">${doneLast(list).map((it) => itemHtml(it, y, m)).join('')}</ul>
       <form class="item-add" data-y="${y}" data-m="${m}"><input type="text" maxlength="200" placeholder="계획 추가" aria-label="${m}월 계획 추가"><button class="btn" type="submit">추가</button></form>
       <textarea data-memo-y="${y}" data-memo-m="${m}" rows="2" placeholder="메모" aria-label="${m}월 메모">${esc(p?.memos[m] || '')}</textarea>
     </section>`;
@@ -136,7 +138,7 @@ function openCell(y, m) {
 function renderCell() {
   if (!modal) return;
   const { y, m } = modal;
-  $('cell-items').innerHTML = (data.plans[y]?.months[m] || []).map((it) => itemHtml(it, y, m)).join('');
+  $('cell-items').innerHTML = doneLast(data.plans[y]?.months[m] || []).map((it) => itemHtml(it, y, m)).join('');
   $('cell-blocks').innerHTML = timelineHtml(y, m);
 }
 function closeCell() {
@@ -772,7 +774,7 @@ function toast(t, actionLabel, action) {
 let todoFilter = 'all', lastTodos = null;
 function renderTodos() {
   const list = data.todos || (data.todos = []);
-  const shown = list.filter((t) => todoFilter === 'all' || (todoFilter === 'done' ? t.done : !t.done));
+  const shown = doneLast(list.filter((t) => todoFilter === 'all' || (todoFilter === 'done' ? t.done : !t.done)));
   const done = list.filter((t) => t.done).length;
   $('todo-count').textContent = list.length ? `완료 ${done} / ${list.length}` : '';
   $('todo-items').innerHTML = shown.map((t) => `<li class="item${t.done ? ' done' : ''}" data-tid="${esc(t.id)}">
